@@ -18,20 +18,31 @@ import os
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
+import importlib.util
 
 
 # xk
-deepspeed_is_installed = True
-# deepspeed_is_installed = importlib.util.find_spec("deepspeed") is not None
-ds4s_is_installed = (
-    deepspeed_is_installed
-    and importlib.util.find_spec("deepspeed.ops.deepspeed4science") is not None
-)
-if deepspeed_is_installed:
-    import deepspeed
+deepspeed_is_installed = importlib.util.find_spec("deepspeed") is not None
+ds4s_is_installed = False
+deepspeed = None
+DS4Sci_EvoformerAttention = None
 
-if ds4s_is_installed:
-    from deepspeed.ops.deepspeed4science import DS4Sci_EvoformerAttention
+if deepspeed_is_installed:
+    try:
+        import deepspeed as _ds
+        deepspeed = _ds
+        ds4s_is_installed = (
+            importlib.util.find_spec("deepspeed.ops.deepspeed4science") is not None
+        )
+        if ds4s_is_installed:
+            from deepspeed.ops.deepspeed4science import DS4Sci_EvoformerAttention as _DS4
+            DS4Sci_EvoformerAttention = _DS4
+    except Exception:
+        # Any exceptions are downgraded: deepspeed / ds4science is not used.
+        deepspeed_is_installed = False
+        ds4s_is_installed = False
+        deepspeed = None
+        DS4Sci_EvoformerAttention = None
 
 fa_is_installed = importlib.util.find_spec("flash_attn") is not None
 if fa_is_installed:
@@ -39,10 +50,14 @@ if fa_is_installed:
     from flash_attn.flash_attn_interface import flash_attn_unpadded_kvpacked_func
 
 # fastln_is_installed = os.getenv("LAYERNORM_TYPE", None) == "fast_layernorm"
-fastln_is_installed = True
-if fastln_is_installed:
-    # LayerNorm is a time bottomneck, so we use a custom implementation.
+fastln_is_installed = False
+try:
     from models.layer_norm.layer_norm import FusedLayerNorm
+    fastln_is_installed = True
+except Exception:
+    fastln_is_installed = False
+    FusedLayerNorm = None
+
 
 import torch
 import torch.nn as nn
