@@ -398,10 +398,20 @@ def process_file(
 
     return metadata
 
-
 def preprocess_csv_and_pkl(args, output_dir: str) -> str:
     """Process PDB files and generate pkl and metadata CSV."""
+    import glob
+    import os
+
     csv_path = os.path.join(output_dir, f"{args.name}_input.csv")
+
+    # To prevent duplicate processing of the same name, append the CSV header to the middle of the file.
+    if os.path.exists(csv_path):
+        os.remove(csv_path)
+
+    # Simultaneously clean up old pkl files to prevent processed_path from pointing to old files.
+    for f in glob.glob(os.path.join(output_dir, f"{args.name}_sample_*.pkl")):
+        os.remove(f)
 
     input_info = {
         "antigen_pdb": args.antigen_pdb,
@@ -421,10 +431,12 @@ def preprocess_csv_and_pkl(args, output_dir: str) -> str:
             input_info, write_dir=output_dir, sample_id=sample_id
         )
         metadata_df = pd.DataFrame([metadata])
-        header = False if sample_id > 0 else True
+        header = sample_id == 0
         metadata_df.to_csv(csv_path, index=False, mode="a", header=header)
 
     return csv_path
+
+
 
 
 # =============================================================================
